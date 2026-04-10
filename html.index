@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEB DROP | NAVIN CHAUDHARY</title>
+    
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #ffffff; --text: #000000; 
+            --card-bg: rgba(255, 255, 255, 0.35); 
+            --border: rgba(0, 0, 0, 0.15); 
+            --btn-sec: rgba(245, 245, 247, 0.5); 
+            --accent: #000000; 
+            --status-off: #8e8e93; --status-on: #34c759;
+        }
+
+        [data-theme="dark"] {
+            --bg: #050505; --text: #ffffff; 
+            --card-bg: rgba(15, 15, 15, 0.45); 
+            --border: rgba(255, 255, 255, 0.15); 
+            --btn-sec: rgba(30, 30, 30, 0.5); 
+            --accent: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease; -webkit-tap-highlight-color: transparent; }
+        body { height: 100vh; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; overflow: hidden; }
+
+        /* --- Background Video Layer --- */
+        #video-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; filter: brightness(0.85); transition: filter 0.5s; }
+        [data-theme="dark"] #video-bg { filter: brightness(0.5); }
+        #particle-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+
+        /* --- Loaders & Intros --- */
+        #loader { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
+        .spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--text); animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hide { opacity: 0; visibility: hidden; pointer-events: none; }
+        
+        #intro { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; opacity: 0; z-index: 9998; pointer-events: none; transition: opacity 0.5s ease; }
+        #intro.show { animation: fadeIn 1s ease forwards; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .glitch { font-size: 48px; letter-spacing: -1.5px; color: var(--text); display: flex; align-items: center;}
+        .web-i { font-weight: 800; text-transform: uppercase; margin-right: 2px; }
+        .drop-i { font-weight: 300; font-style: italic; }
+
+        #main-app { display: none; opacity: 0; transition: opacity 1s ease; width: 100%; justify-content: center; align-items: center; }
+        #main-app.visible { opacity: 1; }
+
+        /* --- Navigation & Volume Controls --- */
+        .top-nav { position: absolute; top: 30px; left: 30px; right: 30px; display: flex; justify-content: space-between; z-index: 100; align-items: center; }
+        .icon-btn { background: var(--btn-sec); border: 1px solid var(--border); width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); z-index: 101; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .icon-btn:active { transform: scale(0.92); }
+        
+        .pulse-wrapper { display: flex; align-items: center; gap: 10px; }
+        .dot-indicator { width: 10px; height: 10px; border-radius: 50%; background: var(--status-off); position: relative; margin-right: 5px; transition: background 0.3s ease; }
+        .dot-indicator.active { background: var(--status-on); }
+        .dot-indicator::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1px solid currentColor; animation: pulse 1.5s infinite; opacity: 0.6; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
+
+        /* Volume Slider Custom UI */
+        .volume-container { display: flex; align-items: center; background: var(--btn-sec); border: 1px solid var(--border); border-radius: 14px; padding: 0 12px; height: 48px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); gap: 8px; overflow: hidden; transition: width 0.3s ease; }
+        #volume-slider { width: 0; opacity: 0; transition: all 0.3s ease; cursor: pointer; accent-color: var(--text); height: 4px; }
+        .volume-container:hover #volume-slider { width: 80px; opacity: 1; }
+
+        /* --- Side Menu & Overlays --- */
+        .side-menu { position: fixed; top: 0; left: -340px; width: 340px; height: 100%; background: var(--card-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-right: 1px solid var(--border); z-index: 300; padding: 60px 35px; transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; overflow-y: auto; }
+        .side-menu.active { left: 0; }
+        .menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 250; display: none; backdrop-filter: blur(4px); }
+        .menu-item { padding: 18px 0; border-bottom: 1px solid var(--border); cursor: pointer; font-weight: 600; font-size: 1rem; color: var(--text); transition: opacity 0.2s ease; }
+        .menu-item:active { opacity: 0.5; }
+
+        /* Auth System */
+        .auth-card { background: var(--btn-sec); border: 1px solid var(--border); border-radius: 22px; padding: 25px; margin-bottom: 25px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+        .profile-pic { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); margin-bottom: 5px; }
+        .profile-name { font-weight: 800; font-size: 1.1rem; color: var(--text); }
+        .profile-email { font-size: 0.8rem; color: #86868b; font-family: 'JetBrains Mono', monospace; }
+        
+        /* Transfer Logs */
+        .log-box { background: transparent; border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-bottom: 25px; }
+        .log-title { font-size: 0.75rem; font-weight: 700; color: #86868b; letter-spacing: 1.5px; margin-bottom: 15px; text-transform: uppercase; }
+        .log-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; }
+        .log-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .log-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+
+        /* --- Main Card Architecture --- */
+        .card { position: relative; background: var(--card-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid var(--border); padding: 3.5rem 2.5rem; width: 92%; max-width: 400px; min-height: 480px; display: flex; flex-direction: column; justify-content: space-between; z-index: 10; border-radius: 42px; text-align: center; box-shadow: 0 30px 60px rgba(0,0,0,0.2); perspective: 1200px; }
+        .neon-bar { position: absolute; top: 0; left: 0; height: 4px; background: var(--text); width: 0%; opacity: 0; z-index: 20; box-shadow: 0 0 15px var(--text); }
+        
+        .main-logo { font-size: 2.2rem; letter-spacing: -0.5px; margin-bottom: 5px; display: flex; justify-content: center; align-items: center;}
+        .web { font-weight: 800; text-transform: uppercase; margin-right: 2px; }
+        .drop { font-weight: 300; font-style: italic; }
+        .typing-container { font-size: 0.8rem; color: #86868b; font-family: 'JetBrains Mono', monospace; min-height: 1.2rem; margin-bottom: 2rem; }
+        .screen-wrapper { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
+
+        /* --- File Preview Box & 3D Animations --- */
+        .preview-area { max-height: 240px; overflow-y: auto; margin-bottom: 1.5rem; padding-right: 8px; }
+        .preview-area::-webkit-scrollbar { width: 5px; }
+        .preview-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+
+        .file-preview-box { background: var(--btn-sec); border: 1px solid var(--border); border-radius: 20px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 12px; text-align: left; transition: all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1); position: relative; transform-style: preserve-3d; }
+        .file-preview-box.sent-anim { transform: rotateY(180deg) scale(0.8); opacity: 0; height: 0; margin: 0; padding: 0; border-color: transparent; }
+        .sent-overlay { position: absolute; inset: 0; background: var(--text); color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; opacity: 0; transition: 0.4s ease; transform: rotateY(180deg); border-radius: 18px; letter-spacing: 2px; }
+        .file-preview-box.success .sent-overlay { opacity: 1; }
+        .file-preview-box.success .f-content { opacity: 0; }
+        .f-content { display: flex; align-items: center; gap: 14px; width: 100%; transition: 0.3s ease; }
+        .file-thumb { width: 44px; height: 44px; background: var(--border); border-radius: 12px; display: flex; justify-content: center; align-items: center; color: var(--text); }
+        .f-info { overflow: hidden; width: 100%; }
+        .f-name { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; color: var(--text); }
+        .f-size { font-size: 0.7rem; color: #86868b; font-family: 'JetBrains Mono', monospace; margin-top: 3px; display: block;}
+
+        /* --- Buttons & Inputs --- */
+        button { width: 100%; padding: 1.2rem; margin-top: 12px; background: var(--accent); color: var(--bg); border: none; font-weight: 700; border-radius: 20px; cursor: pointer; font-size: 0.95rem; transition: transform 0.2s ease, opacity 0.2s ease; }
+        button:active { transform: scale(0.96); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-outline { background: var(--btn-sec); color: var(--text); border: 1px solid var(--border); }
+        .btn-small { padding: 0.7rem 1.2rem; border-radius: 12px; font-size: 0.8rem; margin-top: 0; width: auto;}
+        .hidden { display: none !important; }
+        
+        input { width: 100%; padding: 1.2rem; background: var(--btn-sec); border: 1px solid var(--border); color: var(--text); text-align: center; font-size: 1.3rem; border-radius: 20px; outline: none; margin-bottom: 15px; font-weight: 600; }
+        input::placeholder { color: #86868b; font-weight: 500;}
+        .pin-box { font-size: 3.8rem; font-weight: 800; margin: 1.5rem 0; letter-spacing: 12px; color: var(--text); }
+        .made-with { font-size: 0.7rem; color: #86868b; font-weight: 600; margin-top: 2rem; }
+
+        /* --- Modals --- */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:600; flex-direction:column; align-items:center; justify-content:center; padding: 20px; backdrop-filter: blur(5px); }
+        .modal-content { width: 100%; max-width: 350px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 24px; padding: 30px; text-align: center; backdrop-filter: blur(15px); }
+
+        /* --- CPU Node Monitor --- */
+        #conn-monitor { position: fixed; bottom: 35px; right: 30px; width: 260px; background: var(--card-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid var(--border); border-radius: 26px; padding: 22px; z-index: 500; display: none; text-align: left; box-shadow: 0 15px 40px rgba(0,0,0,0.2); }
+        #pulse-graph { height: 45px; border-bottom: 1px solid var(--border); margin-bottom: 18px; display: flex; align-items: flex-end; gap: 4px; }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div id="g_id_onload"
+         data-client_id="281176157897-ubrns39thpulnev79aiucns44lggk9od.apps.googleusercontent.com"
+         data-context="signin"
+         data-ux_mode="popup"
+         data-callback="handleGoogleResponse"
+         data-auto_prompt="false">
+    </div>
+
+    <video id="video-bg" autoplay loop muted playsinline>
+        <source id="video-source" src="https://res.cloudinary.com/dmjoso48w/video/upload/v1775815552/lv_0_20260410152222_b1ulmk.mp4" type="video/mp4">
+    </video>
+
+    <div id="loader"><div class="spinner"></div></div>
+    <div id="intro">
+        <div id="intro-content" class="glitch">
+            <span class="web-i">WEB</span><span class="drop-i">drop</span>
+        </div>
+    </div>
+
+    <div id="main-app">
+        
+        <div class="top-nav">
+            <div class="icon-btn" onclick="toggleMenu()">
+                <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5"/></svg>
+            </div>
+            
+            <div class="pulse-wrapper">
+                <div id="status-dot" class="dot-indicator"></div>
+                
+                <div class="volume-container">
+                    <div id="speaker-icon" onclick="toggleMute()" style="cursor:pointer; display:flex; color: var(--text);">
+                        <svg id="svg-volume-mute" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-volume-mute" viewBox="0 0 16 16">
+                            <path d="M6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06M6 5.04 4.312 6.39A.5.5 0 0 1 4 6.5H2v3h2a.5.5 0 0 1 .312.11L6 10.96zm7.854.606a.5.5 0 0 1 0 .708L12.207 8l1.647 1.646a.5.5 0 0 1-.708.708L11.5 8.707l-1.646 1.647a.5.5 0 0 1-.708-.708L10.793 8 9.146 6.354a.5.5 0 1 1 .708-.708L11.5 7.293l1.646-1.647a.5.5 0 0 1 .708 0"/>
+                        </svg>
+                        <svg id="svg-volume-on" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-volume-down-fill" viewBox="0 0 16 16" style="display:none;">
+                            <path d="M9 4a.5.5 0 0 0-.812-.39L5.825 5.5H3.5A.5.5 0 0 0 3 6v4a.5.5 0 0 0 .5.5h2.325l2.363 1.89A.5.5 0 0 0 9 12zm3.025 4a4.5 4.5 0 0 1-1.318 3.182L10 10.475A3.5 3.5 0 0 0 11.025 8 3.5 3.5 0 0 0 10 5.525l.707-.707A4.5 4.5 0 0 1 12.025 8"/>
+                        </svg>
+                    </div>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0">
+                </div>
+
+                <div class="icon-btn" onclick="toggleVideoTheme()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-palette-fill" viewBox="0 0 16 16">
+                        <path d="M12.433 10.07C14.133 10.585 16 11.15 16 8a8 8 0 1 0-8 8c1.996 0 1.826-1.504 1.649-3.08-.124-1.101-.252-2.237.351-2.92.465-.527 1.42-.237 2.433.07M8 5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m4.5 3a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3M5 6.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m.5 6.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"/>
+                    </svg>
+                </div>
+
+                <div class="icon-btn" onclick="toggleTheme()">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M7 8a3.5 3.5 0 0 1 3.5 3.555.5.5 0 0 0 .625.492A1.503 1.503 0 0 1 13 13.5a1.5 1.5 0 0 1-1.5 1.5H3a2 2 0 1 1 .1-3.998.5.5 0 0 0 .509-.375A3.5 3.5 0 0 1 7 8m4.473 3a4.5 4.5 0 0 0-8.72-.99A3 3 0 0 0 3 16h8.5a2.5 2.5 0 0 0 0-5z"/><path d="M11.286 1.778a.5.5 0 0 0-.565-.755 4.595 4.595 0 0 0-3.18 5.003 5.5 5.5 0 0 1 1.055.209A3.6 3.6 0 0 1 9.83 2.617a4.593 4.593 0 0 0 4.31 5.744 3.58 3.58 0 0 1-2.241.634q.244.477.394 1a4.59 4.59 0 0 0 3.624-2.04.5.5 0 0 0-.565-.755 3.593 3.593 0 0 1-4.065-5.422z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="menu-overlay" id="overlay" onclick="toggleMenu()"></div>
+        
+        <div id="side-menu" class="side-menu">
+            
+            <div id="auth-section" class="auth-card">
+                <div id="google-btn-wrapper">
+                    <p style="font-size: 0.85rem; font-weight: 600; margin-bottom:12px; color:var(--text);">Identify Yourself</p>
+                    <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+                </div>
+                
+                <div id="profile-display" class="hidden">
+                    <img id="user-avatar" class="profile-pic" src="" alt="User">
+                    <div id="user-name" class="profile-name"></div>
+                    <div id="user-email" class="profile-email"></div>
+                    <button onclick="logout()" class="btn-outline btn-small" style="margin-top: 15px; color: #ff3b30; border-color: #ff3b30;">Sign Out</button>
+                </div>
+            </div>
+
+            <div class="log-box">
+                <div class="log-title">Transfer Logs</div>
+                <div id="log-list">
+                    <div style="font-size:0.75rem; color:#86868b; text-align:center;">No recent transfers</div>
+                </div>
+            </div>
+
+            <div class="menu-item" onclick="forceAction('home')">Home Interface</div>
+            <div class="menu-item" onclick="forceAction('share')">Share Node (QR)</div>
+            <div style="flex-grow: 1;"></div>
+            <div class="menu-item" onclick="forceAction('terminate')" style="color: #ff3b30; border: none; font-weight: 800;">Terminate Session</div>
+        </div>
+
+        <div id="conn-monitor">
+            <p style="font-size:0.7rem; letter-spacing:1.5px; color:#86868b; margin-bottom:15px; font-weight:700;">NODE HEALTH</p>
+            <div id="pulse-graph"></div>
+            <div style="font-family:'JetBrains Mono'; font-size:0.8rem; color:var(--text);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">Status: <span id="stat-link" style="color:var(--status-off); font-weight:600;">Standby</span></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">Latency: <span id="stat-inflation" style="font-weight:600;">0.0 ms</span></div>
+                <div style="display:flex; justify-content:space-between;">Integrity: <span id="stat-integrity" style="font-weight:600;">100%</span></div>
+            </div>
+        </div>
+
+        <canvas id="particle-canvas"></canvas>
+
+        <div class="card">
+            <div id="neon-progress" class="neon-bar"></div>
+            
+            <header>
+                <div class="main-logo"><span class="web">WEB</span><span class="drop">drop</span></div>
+                <div id="typing-line" class="typing-container"></div>
+            </header>
+            
+            <div class="screen-wrapper">
+                <div id="home-screen">
+                    <button onclick="openSender()">Push Data</button>
+                    <button class="btn-outline" onclick="openReceiver()">Receive Data</button>
+                </div>
+
+                <div id="receive-screen" class="hidden">
+                    <p style="font-size: 0.8rem; color:#86868b; font-weight: 700; letter-spacing:1px;">YOUR UPLINK PIN</p>
+                    <div class="pin-box" id="my-pin">-----</div>
+                    <button class="btn-outline" onclick="forceAction('home')" style="margin-top: 1rem;">← ABORT</button>
+                </div>
+
+                <div id="send-screen" class="hidden">
+                    <input type="number" id="target-pin" placeholder="Enter PIN">
+                    <button onclick="linkPeer()">Establish Link</button>
+                    <button class="btn-outline" onclick="forceAction('home')">← CANCEL</button>
+                </div>
+
+                <div id="workspace" class="hidden">
+                    <input type="file" id="file-input" multiple style="display:none;" onchange="updateFileList()">
+                    <button class="btn-outline" onclick="document.getElementById('file-input').click()">Pick Documents</button>
+                    
+                    <div class="preview-area" id="preview-list"></div>
+                    
+                    <button id="send-btn" onclick="transmitQueue()">Transmit Data</button>
+                </div>
+            </div>
+
+            <div class="made-with">Made with love Navin Chaudhary</div>
+        </div>
+    </div>
+
+    <div id="qr-modal" class="modal-overlay">
+        <div class="modal-content" style="padding: 40px 20px;">
+            <div id="qr-typing" style="font-family:'JetBrains Mono'; font-weight:700; margin-bottom:20px; color:var(--text);">SCAN TO CLONE</div>
+            <div id="qrcode-container" style="background:white; padding:20px; border-radius:24px; display:inline-block;"></div>
+            <button onclick="document.getElementById('qr-modal').style.display='none'" class="btn-outline" style="margin-top:30px;">DISMISS</button>
+        </div>
+    </div>
+
+    <script>
+        // --- System Config ---
+        const ID_PREFIX = "wd-navin-";
+        let peer = null, conn = null, selectedFiles = [];
+
+        // --- Video Theme Array & Logic ---
+        // Add as many video links as you want inside this array
+        const videoThemes = [
+            "https://res.cloudinary.com/dmjoso48w/video/upload/v1775815552/lv_0_20260410152222_b1ulmk.mp4",
+            "https://res.cloudinary.com/dmjoso48w/video/upload/v1775815550/lv_0_20260410152526_q3jsvz.mp4"
+        ];
+        let currentVideoIdx = 0;
+
+        function toggleVideoTheme() {
+            currentVideoIdx = (currentVideoIdx + 1) % videoThemes.length;
+            const videoBg = document.getElementById('video-bg');
+            videoBg.src = videoThemes[currentVideoIdx];
+            videoBg.play();
+        }
+
+        // --- Video Audio Controls ---
+        const video = document.getElementById('video-bg');
+        const slider = document.getElementById('volume-slider');
+        
+        function toggleMute() {
+            video.muted = !video.muted;
+            slider.value = video.muted ? 0 : 0.5;
+            video.volume = slider.value;
+            updateSpeakerIcon();
+        }
+        slider.addEventListener('input', (e) => {
+            video.volume = e.target.value;
+            video.muted = video.volume === 0;
+            updateSpeakerIcon();
+        });
+        function updateSpeakerIcon() {
+            const muteSvg = document.getElementById('svg-volume-mute');
+            const onSvg = document.getElementById('svg-volume-on');
+            if (video.muted) {
+                muteSvg.style.display = 'block';
+                onSvg.style.display = 'none';
+            } else {
+                muteSvg.style.display = 'none';
+                onSvg.style.display = 'block';
+            }
+        }
+
+        // --- Boot Sequence (Glitch Fixed) ---
+        window.addEventListener('load', () => {
+            loadLogs();
+            checkAuthStatus();
+            
+            setTimeout(()=> { 
+                document.getElementById("loader").classList.add("hide"); 
+                document.getElementById("intro").classList.add("show"); 
+            }, 1500);
+            
+            setTimeout(()=> { 
+                document.getElementById("intro").classList.remove("show");
+                document.getElementById("intro").style.display = "none";
+                
+                const mainApp = document.getElementById("main-app");
+                mainApp.style.display = "flex"; 
+                void mainApp.offsetWidth; // Trigger reflow
+                mainApp.classList.add("visible");
+                
+                startTyping();
+            }, 4000);
+        });
+
+        // --- STRICT AUTH LOGIC (Google Only) ---
+        function parseJwt(token) {
+            var base64Url = token.split('.')[1];
+            var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            var jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        }
+
+        function handleGoogleResponse(response) {
+            const data = parseJwt(response.credential);
+            const userProfile = { name: data.name, email: data.email, pic: data.picture };
+            localStorage.setItem('webdrop_user', JSON.stringify(userProfile));
+            checkAuthStatus();
+        }
+
+        function logout() {
+            localStorage.removeItem('webdrop_user');
+            checkAuthStatus();
+        }
+
+        function checkAuthStatus() {
+            const userStr = localStorage.getItem('webdrop_user');
+            const googleBtn = document.getElementById('google-btn-wrapper');
+            const profileDisplay = document.getElementById('profile-display');
+
+            if(userStr) {
+                const user = JSON.parse(userStr);
+                document.getElementById('user-avatar').src = user.pic;
+                document.getElementById('user-name').innerText = user.name;
+                document.getElementById('user-email').innerText = user.email;
+                googleBtn.classList.add('hidden');
+                profileDisplay.classList.remove('hidden');
+            } else {
+                googleBtn.classList.remove('hidden');
+                profileDisplay.classList.add('hidden');
+            }
+        }
+
+        // --- Log Management ---
+        function addLog(filename, size) {
+            let logs = JSON.parse(localStorage.getItem('wd_logs')) || [];
+            logs.unshift({ name: filename, size: size, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) });
+            if(logs.length > 5) logs.pop();
+            localStorage.setItem('wd_logs', JSON.stringify(logs)); loadLogs();
+        }
+        function loadLogs() {
+            const logs = JSON.parse(localStorage.getItem('wd_logs')) || [];
+            const list = document.getElementById('log-list');
+            if(logs.length === 0) return;
+            list.innerHTML = "";
+            logs.forEach(l => { list.innerHTML += `<div class="log-item"><span class="log-name">${l.name}</span><span style="color:#86868b;">${l.time}</span></div>`; });
+        }
+
+        // --- SOFT RESET FIX (No Reload) ---
+        function resetSystem() {
+            if(conn) { conn.close(); conn = null; }
+            if(peer) { peer.destroy(); peer = null; }
+            document.getElementById('status-dot').classList.remove('active');
+            document.getElementById('file-input').value = "";
+            selectedFiles = []; document.getElementById('preview-list').innerHTML = ""; document.getElementById('target-pin').value = "";
+            showScreen('home-screen');
+        }
+
+        function forceAction(action) {
+            if(document.getElementById('side-menu').classList.contains('active')) toggleMenu(); 
+            setTimeout(() => {
+                if (action === 'home') { resetSystem(); } 
+                else if (action === 'share') {
+                    const qr = document.getElementById('qrcode-container'); qr.innerHTML = ""; 
+                    new QRCode(qr, { text: window.location.href, width: 200, height: 200 }); 
+                    document.getElementById('qr-modal').style.display='flex'; startQRTitle();
+                } 
+                else if (action === 'terminate') {
+                    if (navigator.vibrate) navigator.vibrate([400, 100, 400]); resetSystem();
+                }
+            }, 300);
+        }
+
+        // --- General UI ---
+        function toggleMenu() { document.getElementById('side-menu').classList.toggle('active'); document.getElementById('overlay').style.display = document.getElementById('side-menu').classList.contains('active') ? 'block' : 'none'; }
+        function toggleTheme() { document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; }
+        function showScreen(id) { document.querySelectorAll('.screen-wrapper > div').forEach(d => d.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+
+        // --- P2P Connection ---
+        function openReceiver() {
+            showScreen('receive-screen');
+            const pin = Math.floor(10000 + Math.random() * 90000).toString();
+            peer = new Peer(ID_PREFIX + pin);
+            peer.on('open', () => document.getElementById('my-pin').innerText = pin);
+            peer.on('connection', c => { conn = c; setupHandlers(); });
+        }
+
+        function openSender() { showScreen('send-screen'); peer = new Peer(); }
+        function linkPeer() { 
+            const pin = document.getElementById('target-pin').value; 
+            if(pin.length >= 5) { conn = peer.connect(ID_PREFIX + pin); setupHandlers(); }
+        }
+
+        function setupHandlers() {
+            conn.on('open', () => { 
+                showScreen('workspace'); document.getElementById('status-dot').classList.add('active');
+                if (navigator.vibrate) navigator.vibrate([100, 30, 100, 30, 200]);
+            });
+            conn.on('data', data => {
+                const b = new Blob([data.file]); const a = document.createElement('a');
+                a.href = URL.createObjectURL(b); a.download = data.name; a.click();
+            });
+            conn.on('close', () => resetSystem());
+        }
+
+        // --- File System & Animation ---
+        function updateFileList() {
+            selectedFiles = Array.from(document.getElementById('file-input').files);
+            const list = document.getElementById('preview-list'); list.innerHTML = "";
+            selectedFiles.forEach((f, i) => {
+                list.innerHTML += `
+                    <div class="file-preview-box" id="file-${i}">
+                        <div class="sent-overlay">SENT</div>
+                        <div class="f-content">
+                            <div class="file-thumb"><svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/></svg></div>
+                            <div class="f-info"><span class="f-name">${f.name}</span><span class="f-size">${(f.size/1024/1024).toFixed(2)} MB</span></div>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        async function transmitQueue() {
+            if(selectedFiles.length === 0) return;
+            const btn = document.getElementById('send-btn');
+            const neon = document.getElementById('neon-progress');
+            btn.disabled = true; btn.innerText = "Transmitting...";
+
+            for(let i=0; i<selectedFiles.length; i++) {
+                const f = selectedFiles[i]; const box = document.getElementById(`file-${i}`);
+
+                neon.style.transition = "none"; neon.style.width = "0%"; neon.style.opacity = "1";
+                await new Promise(r => setTimeout(r, 50));
+                neon.style.transition = "width 2.5s linear"; neon.style.width = "100%";
+
+                conn.send({ file: f, name: f.name });
+                addLog(f.name, (f.size/1024/1024).toFixed(2) + " MB");
+                await new Promise(r => setTimeout(r, 2500));
+
+                box.classList.add('success');
+                if (navigator.vibrate) navigator.vibrate(40); 
+                await new Promise(r => setTimeout(r, 600)); 
+                
+                box.classList.add('sent-anim'); neon.style.opacity = "0"; 
+                await new Promise(r => setTimeout(r, 700));
+                box.style.display = "none";
+            }
+            btn.disabled = false; btn.innerText = "Transmit Data";
+            document.getElementById('file-input').value = ""; selectedFiles = [];
+        }
+
+        // --- Effects ---
+        const quotes = ["Initializing Framework...", "Establishing Nodes...", "P2P Core Active.", "Cinematic Mode OS."];
+        let qIdx = 0, charIdx = 0;
+        function startTyping() {
+            const el = document.getElementById("typing-line");
+            if (charIdx < quotes[qIdx].length) { el.innerHTML += quotes[qIdx].charAt(charIdx); charIdx++; setTimeout(startTyping, 80); } 
+            else { setTimeout(() => { el.innerHTML = ""; charIdx = 0; qIdx = (qIdx + 1) % quotes.length; startTyping(); }, 2500); }
+        }
+
+        let qrInterval;
+        function startQRTitle() {
+            const el = document.getElementById("qr-typing"); const text = "SCAN TO CLONE"; let i = 0; el.innerHTML = "";
+            qrInterval = setInterval(() => { el.innerHTML += text[i]; i++; if(i >= text.length) { setTimeout(() => { el.innerHTML = ""; i = 0; }, 1500); } }, 150);
+        }
+
+        let monitorInterval;
+        function toggleMonitor() {
+            const mon = document.getElementById('conn-monitor');
+            if (mon.style.display === 'block') { mon.style.display = 'none'; clearInterval(monitorInterval); } 
+            else { mon.style.display = 'block'; startHealthTracking(); }
+        }
+        function startHealthTracking() {
+            const graph = document.getElementById('pulse-graph');
+            monitorInterval = setInterval(() => {
+                if(!conn || !conn.open) { document.getElementById('stat-link').innerText = "Standby"; document.getElementById('stat-link').style.color = "var(--status-off)"; return; }
+                const jitter = Math.random() * 5;
+                document.getElementById('stat-link').innerText = "Optimal"; document.getElementById('stat-link').style.color = "var(--status-on)";
+                document.getElementById('stat-inflation').innerText = (12 + jitter).toFixed(1) + " ms";
+                document.getElementById('stat-integrity').innerText = (100 - jitter).toFixed(0) + "%";
+                const bar = document.createElement('div');
+                bar.style.cssText = `width:5px; height:${Math.max(8, jitter*8)}px; background:var(--text); border-radius:3px; opacity:0.7; transition: 0.2s ease;`;
+                graph.appendChild(bar);
+                if(graph.children.length > 30) graph.removeChild(graph.children[0]);
+            }, 800);
+        }
+
+        const canvas = document.getElementById('particle-canvas'); const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize); resize();
+        let particles = Array.from({length: 40}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, vx: (Math.random() - 0.5) * 0.7, vy: (Math.random() - 0.5) * 0.7 }));
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = document.body.dataset.theme === 'dark' ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)";
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if(p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) { p.x = Math.random() * canvas.width; p.y = Math.random() * canvas.height; }
+                ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, Math.PI*2); ctx.fill();
+            });
+            requestAnimationFrame(loop);
+        } loop();
+    </script>
+</body>
+</html>
